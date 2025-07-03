@@ -1,50 +1,37 @@
 import streamlit as st
-import pandas as pd
-import json
 from datetime import datetime
+import pandas as pd
 import os
 
-LOG_FILE = 'emotion_logs.json'
+st.set_page_config(page_title="らんまる感情ログ", layout="centered")
 
-def load_logs():
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, 'r') as f:
-            return json.load(f)
-    return []
+st.title("📝 らんまる感情ログ")
 
-def save_log(log):
-    logs = load_logs()
-    logs.append(log)
-    with open(LOG_FILE, 'w') as f:
-        json.dump(logs, f, indent=2)
-
-st.title("らんまる 感情ログ")
-
-with st.form("emotion_form"):
-    anxiety = st.slider('不安', 0, 100, 50)
-    happiness = st.slider('幸せ', 0, 100, 50)
-    anger = st.slider('怒り', 0, 100, 50)
-    calm = st.slider('落ち着き', 0, 100, 50)
+# 入力UIを縦並びに変更
+with st.form("log_form"):
+    emotion = st.text_area("今の気持ちを入力してね", height=100)
     submitted = st.form_submit_button("記録する")
+    if submitted and emotion.strip() != "":
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open("logs.csv", "a", encoding="utf-8") as f:
+            f.write(f"{now},{emotion.strip()}\n")
+        st.success("記録したよ！")
 
-if submitted:
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    log_entry = {
-        'timestamp': now,
-        'anxiety': anxiety,
-        'happiness': happiness,
-        'anger': anger,
-        'calm': calm
-    }
-    save_log(log_entry)
-    st.success("感情ログを保存しました！")
+# ログファイルが存在すれば表示
+if os.path.exists("logs.csv"):
+    st.subheader("📚 過去の記録")
+    df = pd.read_csv("logs.csv", names=["日時", "感情"], encoding="utf-8")
 
-logs = load_logs()
-if logs:
-    st.subheader("過去ログ")
-    df = pd.DataFrame(logs)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    st.dataframe(df.sort_values('timestamp', ascending=False))
-    st.line_chart(df.set_index('timestamp')[['anxiety','happiness','anger','calm']])
-else:
-    st.info("まだ感情ログはありません。")
+    # 表示エリアをスクロール可能に
+    with st.container():
+        st.markdown(
+            """
+            <div style='max-height: 300px; overflow-y: scroll; padding: 10px; border: 1px solid #ddd; border-radius: 10px; background-color: #f9f9f9;'>
+            """,
+            unsafe_allow_html=True
+        )
+        for i in range(len(df)-1, -1, -1):
+            st.markdown(f"**{df.iloc[i]['日時']}**")
+            st.markdown(f"{df.iloc[i]['感情']}")
+            st.markdown("---")
+        st.markdown("</div>", unsafe_allow_html=True)
